@@ -1,0 +1,1 @@
+pip install torch scikit-learn pandas numpy matplotlib onnx onnxruntime
