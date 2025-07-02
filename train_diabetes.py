@@ -3,6 +3,7 @@ import torch.nn as nn
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+import json  # <-- for saving scaler params
 
 # ------------------------
 # Neural Network Definition
@@ -32,6 +33,15 @@ def load_and_preprocess_data(csv_path):
 
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X)
+
+    # Save scaler params for later use in .NET
+    scaler_params = {
+        "mean": scaler.mean_.tolist(),
+        "scale": scaler.scale_.tolist()
+    }
+    with open("scaler_params.json", "w") as f:
+        json.dump(scaler_params, f)
+    print("✅ Scaler parameters saved to scaler_params.json")
 
     return train_test_split(X_scaled, y, test_size=0.2, random_state=42)
 
@@ -79,23 +89,23 @@ def export_model_to_onnx(model, filepath="diabetes_model.onnx"):
         opset_version=11
     )
 
-    print(f"✅ Modèle exporté avec entrée 'input' : {filepath}")
+    print(f"✅ Model exported to ONNX: {filepath}")
 
 # ------------------------
 # Main Script
 # ------------------------
 def main():
-    print("📥 Chargement des données...")
+    print("📥 Loading data...")
     X_train, X_test, y_train, y_test = load_and_preprocess_data("diabetes.csv")
     print(f"Train size: {len(X_train)}, Test size: {len(X_test)}")
 
-    print("🏋️‍♂️ Entraînement du modèle...")
+    print("🏋️‍♂️ Training model...")
     model = train_model(X_train, y_train)
 
-    print("💾 Sauvegarde des poids du modèle...")
+    print("💾 Saving model weights...")
     torch.save(model.state_dict(), "diabetes_model.pth")
 
-    print("📦 Export en ONNX...")
+    print("📦 Exporting to ONNX...")
     export_model_to_onnx(model)
 
 if __name__ == "__main__":
