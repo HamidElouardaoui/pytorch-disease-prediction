@@ -1,19 +1,18 @@
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import roc_auc_score
 import xgboost as xgb
+from sklearn.metrics import accuracy_score, roc_auc_score
+from sklearn.preprocessing import MinMaxScaler
+from sklearn.model_selection import train_test_split
 import onnxmltools
 from onnxmltools.convert.common.data_types import FloatTensorType
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import MinMaxScaler
 import json
 import os
+import math  # Import math module to calculate the logit score
 
 # ------------------------
 # Data Loading and Preprocessing
 # ------------------------
 def load_and_preprocess_data(csv_path):
-    # Charger les données
     df = pd.read_csv(csv_path)
 
     # Split Train/Test (80% training, 20% test)
@@ -33,8 +32,10 @@ def load_and_preprocess_data(csv_path):
         "min": scaler.data_min_.tolist(),
         "scale": scaler.scale_.tolist()
     }
+
     if not os.path.exists("MLModels"):
         os.makedirs("MLModels")
+
     with open("MLModels/scaler_params.json", "w") as f:
         json.dump(scaler_params, f)
 
@@ -44,17 +45,17 @@ def load_and_preprocess_data(csv_path):
 # Train XGBoost Model with Hyperparameter Tuning
 # ------------------------
 def train_model(X_train, y_train, X_test, y_test):
-    # Initialize XGBoost model (similar to FastTree)
+    # Initialize XGBoost model
     model = xgb.XGBClassifier(
-        n_estimators=300,  # Increase the number of boosting rounds
-        learning_rate=0.1,  # Set learning rate
-        max_depth=10,  # Depth of each tree (increase depth)
+        n_estimators=300,  # Number of boosting rounds
+        learning_rate=0.1,  # Learning rate
+        max_depth=10,  # Depth of trees
         objective="binary:logistic",  # Binary classification
         eval_metric="logloss",  # Log loss as evaluation metric
-        subsample=0.8,  # Subsample ratio of the training instances
-        colsample_bytree=0.8,  # Subsample ratio of columns when constructing each tree
+        subsample=0.8,  # Subsample ratio
+        colsample_bytree=0.8,  # Column sample by tree
         gamma=0.1,  # Regularization term
-        seed=42  # Fix random seed for reproducibility
+        seed=42  # Random seed for reproducibility
     )
 
     # Train the model
@@ -82,7 +83,7 @@ def train_model(X_train, y_train, X_test, y_test):
 # ------------------------
 def export_to_onnx(model, scaler, onnx_model_path="MLModels/diabetes_model.onnx"):
     # Specify the input type (number of features: 8, type: float32)
-    initial_type = [('input', FloatTensorType([None, 8]))]  # 8 features in input
+    initial_type = [('input', FloatTensorType([None, 8]))]  # 8 input features
     
     # Export the trained model to ONNX format using onnxmltools
     model_onnx = onnxmltools.convert.convert_xgboost(model, initial_types=initial_type)
@@ -90,6 +91,32 @@ def export_to_onnx(model, scaler, onnx_model_path="MLModels/diabetes_model.onnx"
     # Save the ONNX model to the specified file
     onnxmltools.utils.save_model(model_onnx, onnx_model_path)
     print(f"📦 Model exported to ONNX: {onnx_model_path}")
+
+# ------------------------
+# Prediction with Sample Input and JSON Return
+# ------------------------
+def predict(model, scaler, input_data):
+    # Preprocess and scale the input data using the saved scaler
+    scaled_input = scaler.transform([input_data])  # Scale the input based on the training scaler
+
+    # Make prediction using the trained model
+    prediction = model.predict_proba(scaled_input)[:, 1]  # Probability of class 1 (diabetes)
+
+    # Convert to standard Python float (instead of NumPy float32) for JSON serializability
+    prediction_value = float(prediction[0])  # Convert from numpy.float32 to python float
+
+    # Determine predicted label (0 or 1 based on threshold)
+    predicted_label = (prediction_value >= 0.5)  # Threshold 0.5 for class prediction
+
+    # Prepare the prediction result as a JSON response
+    result = {
+        "PredictedLabel": bool(predicted_label),  # Convert to boolean for clarity (True or False)
+        "Probability": round(prediction_value, 6),  # Round probability to 6 decimal places
+        "Score": round(math.log(prediction_value / (1 - prediction_value)), 6)  # Logit score, capped
+    }
+
+    # Return the result as JSON formatted string
+    return json.dumps(result, indent=4)
 
 # ------------------------
 # Main Entry
@@ -108,6 +135,22 @@ def main():
 
     # Export the trained model to ONNX
     export_to_onnx(model, scaler, onnx_model_path)
+
+    # Sample test input
+    test_input = {
+        "pregnancies": 0,
+        "glucose": 80,
+        "bloodPressure": 70,
+        "skinThickness": 20,
+        "insulin": 85,
+        "bmi": 22.0,
+        "diabetesPedigreeFunction": 0.1,
+        "age": 25
+    }
+
+    # Make prediction using the trained model and return JSON response
+    prediction_result = predict(model, scaler, list(test_input.values()))
+    print(f"Prediction Result (JSON):\n{prediction_result}")
 
 if __name__ == "__main__":
     main()

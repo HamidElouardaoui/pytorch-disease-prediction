@@ -1,0 +1,106 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "DiseasePrediction.API",
+    "version": "1.0"
+  },
+  "paths": {
+    "/api/Prediction/predict": {
+      "post": {
+        "tags": [
+          "Prediction"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientInput"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientInput"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/PatientInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/Prediction/load-dataset": {
+      "get": {
+        "tags": [
+          "Prediction"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/Training/train-model": {
+      "post": {
+        "tags": [
+          "Training"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "PatientInput": {
+        "type": "object",
+        "properties": {
+          "pregnancies": {
+            "type": "number",
+            "format": "float"
+          },
+          "glucose": {
+            "type": "number",
+            "format": "float"
+          },
+          "bloodPressure": {
+            "type": "number",
+            "format": "float"
+          },
+          "skinThickness": {
+            "type": "number",
+            "format": "float"
+          },
+          "insulin": {
+            "type": "number",
+            "format": "float"
+          },
+          "bmi": {
+            "type": "number",
+            "format": "float"
+          },
+          "diabetesPedigreeFunction": {
+            "type": "number",
+            "format": "float"
+          },
+          "age": {
+            "type": "number",
+            "format": "float"
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}
